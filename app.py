@@ -182,17 +182,13 @@ with p1:
             marker_color=bar_color, width=0.4
         ))
         fig.add_vline(x=6, line_dash="dot", line_color="#aaa", line_width=1)
-     theme = plotly_theme()
-theme["xaxis"] = dict(range=[0, 12], showgrid=False, tickfont=dict(size=9, color="#aaa"))
-theme["yaxis"] = dict(showticklabels=False)
-theme["height"] = 50
-fig.update_layout(**theme)
+        theme = plotly_theme()
+        theme["xaxis"] = dict(range=[0, 12], showgrid=False, tickfont=dict(size=9, color="#aaa"))
+        theme["yaxis"] = dict(showticklabels=False)
+        theme["height"] = 50
+        fig.update_layout(**theme)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         st.caption(f"{tag} · {absorption['sales_30d']} sales in last 30 days vs {metrics['active_listings']} active")
-
-with p2:
-    with st.container(border=True):
-        st.markdown("**Price reductions · this week**")
         st.markdown(f"<span style='font-size:32px;font-family:monospace;font-weight:600;color:#d03b3b;'>{reductions['total']}</span> <span style='color:#aaa;font-size:13px;'>of {metrics['active_listings']} listings ({reductions['pct']:.0f}%)</span>", unsafe_allow_html=True)
         red_df = pd.DataFrame({
             "Type": ["Condos", "Single-family"],
