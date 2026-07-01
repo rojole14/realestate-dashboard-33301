@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from datetime import datetime, date
 import os
 from utils.redfin import load_redfin_data, get_market_metrics, get_price_history, get_dom_history
@@ -22,45 +21,14 @@ st.set_page_config(
 st.markdown("""
 <style>
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    .metric-card {
-        background: #f8f8f7;
-        border-radius: 8px;
-        padding: 14px 16px;
-        height: 100%;
-    }
-    .metric-label {
-        font-size: 11px;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin-bottom: 4px;
-    }
-    .metric-value {
-        font-size: 22px;
-        font-weight: 600;
-        font-family: monospace;
-        color: #111;
-        line-height: 1.1;
-    }
+    .metric-card { background: #f8f8f7; border-radius: 8px; padding: 14px 16px; height: 100%; }
+    .metric-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .metric-value { font-size: 22px; font-weight: 600; font-family: monospace; color: #111; line-height: 1.1; }
     .metric-delta-up   { font-size: 12px; color: #0ca30c; margin-top: 3px; }
     .metric-delta-down { font-size: 12px; color: #d03b3b; margin-top: 3px; }
     .metric-delta-flat { font-size: 12px; color: #888;    margin-top: 3px; }
-    .section-label {
-        font-size: 10px;
-        color: #aaa;
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-        margin: 20px 0 8px;
-    }
-    .ins-note {
-        background: #faeeda;
-        border: 1px solid #f5c87a;
-        border-radius: 6px;
-        padding: 10px 14px;
-        font-size: 12px;
-        color: #6b4a00;
-        margin-top: 10px;
-    }
+    .section-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.07em; margin: 20px 0 8px; }
+    .ins-note { background: #faeeda; border: 1px solid #f5c87a; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #6b4a00; margin-top: 10px; }
     [data-testid="stMetric"] { background: #f8f8f7; border-radius: 8px; padding: 12px; }
 </style>
 """, unsafe_allow_html=True)
@@ -85,28 +53,31 @@ def metric_card(label, value, delta_text, direction):
     """, unsafe_allow_html=True)
 
 
-def plotly_theme():
-    return dict(
+def make_theme(height=None, **kwargs):
+    """Build a plotly layout dict without conflicting keyword args."""
+    t = dict(
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         font=dict(family="sans-serif", size=11, color="#888"),
         margin=dict(l=0, r=0, t=10, b=0),
-        xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa")),
-        yaxis=dict(gridcolor="#eee", tickfont=dict(size=10, color="#aaa")),
     )
+    if height is not None:
+        t["height"] = height
+    t.update(kwargs)
+    return t
 
 
 # ── Load data ──────────────────────────────────────────────────────────────────
 redfin_df, freddie_df = load_all_data()
-metrics = get_market_metrics(redfin_df)
+metrics    = get_market_metrics(redfin_df)
 price_hist = get_price_history(redfin_df)
-dom_hist = get_dom_history(redfin_df)
-rates = get_latest_rates(freddie_df)
-rate_hist = get_rate_history(freddie_df)
+dom_hist   = get_dom_history(redfin_df)
+rates      = get_latest_rates(freddie_df)
+rate_hist  = get_rate_history(freddie_df)
 absorption = calc_absorption_rate(redfin_df)
 reductions = calc_price_reductions(redfin_df)
-funnel = calc_funnel(redfin_df)
-afford = calc_affordability(metrics["median_price"], rates["rate_30yr"])
+funnel     = calc_funnel(redfin_df)
+afford     = calc_affordability(metrics["median_price"], rates["rate_30yr"])
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 col_title, col_badge = st.columns([4, 1])
@@ -167,7 +138,6 @@ with p1:
     with st.container(border=True):
         st.markdown("**Absorption rate**")
         st.markdown(f"<span style='font-size:32px;font-family:monospace;font-weight:600;'>{absorption['months']:.1f}</span> <span style='color:#aaa'>months</span>", unsafe_allow_html=True)
-        pct = min(absorption["months"] / 12, 1.0)
         if absorption["months"] < 4:
             bar_color = "#0ca30c"
             tag = "🟢 Seller's market"
@@ -182,13 +152,17 @@ with p1:
             marker_color=bar_color, width=0.4
         ))
         fig.add_vline(x=6, line_dash="dot", line_color="#aaa", line_width=1)
-        theme = plotly_theme()
-        theme["xaxis"] = dict(range=[0, 12], showgrid=False, tickfont=dict(size=9, color="#aaa"))
-        theme["yaxis"] = dict(showticklabels=False)
-        theme["height"] = 50
-        fig.update_layout(**theme)
+        fig.update_layout(**make_theme(
+            height=50,
+            xaxis=dict(range=[0, 12], showgrid=False, tickfont=dict(size=9, color="#aaa")),
+            yaxis=dict(showticklabels=False),
+        ))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         st.caption(f"{tag} · {absorption['sales_30d']} sales in last 30 days vs {metrics['active_listings']} active")
+
+with p2:
+    with st.container(border=True):
+        st.markdown("**Price reductions · this week**")
         st.markdown(f"<span style='font-size:32px;font-family:monospace;font-weight:600;color:#d03b3b;'>{reductions['total']}</span> <span style='color:#aaa;font-size:13px;'>of {metrics['active_listings']} listings ({reductions['pct']:.0f}%)</span>", unsafe_allow_html=True)
         red_df = pd.DataFrame({
             "Type": ["Condos", "Single-family"],
@@ -203,12 +177,16 @@ with p3:
         st.markdown("**New · pending · closed · last 5 weeks**")
         fig = go.Figure()
         weeks = funnel["weeks"]
-        fig.add_trace(go.Bar(name="New", x=weeks, y=funnel["new"], marker_color="#2a78d6", width=0.25))
+        fig.add_trace(go.Bar(name="New",     x=weeks, y=funnel["new"],     marker_color="#2a78d6", width=0.25))
         fig.add_trace(go.Bar(name="Pending", x=weeks, y=funnel["pending"], marker_color="#eda100", width=0.25))
-        fig.add_trace(go.Bar(name="Closed", x=weeks, y=funnel["closed"], marker_color="#1baf7a", width=0.25))
-        fig.update_layout(**plotly_theme(), height=180, barmode="group",
+        fig.add_trace(go.Bar(name="Closed",  x=weeks, y=funnel["closed"],  marker_color="#1baf7a", width=0.25))
+        fig.update_layout(**make_theme(
+            height=180,
+            barmode="group",
             legend=dict(orientation="h", y=1.15, x=0, font=dict(size=10)),
-            yaxis=dict(gridcolor="#eee", tickfont=dict(size=10, color="#aaa"), title=None))
+            xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa")),
+            yaxis=dict(gridcolor="#eee", tickfont=dict(size=10, color="#aaa"), title=None),
+        ))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         latest = {"New": funnel["new"][-1], "Pending": funnel["pending"][-1], "Closed": funnel["closed"][-1]}
         c1, c2, c3 = st.columns(3)
@@ -230,9 +208,11 @@ with ch1:
             marker=dict(size=5, color="#2a78d6"),
             hovertemplate="$%{y:,.0f}<extra></extra>"
         ))
-        fig.update_layout(**plotly_theme(), height=200,
-            yaxis=dict(tickprefix="$", tickformat=",.0f", gridcolor="#eee",
-                       tickfont=dict(size=10, color="#aaa")))
+        fig.update_layout(**make_theme(
+            height=200,
+            xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa")),
+            yaxis=dict(tickprefix="$", tickformat=",.0f", gridcolor="#eee", tickfont=dict(size=10, color="#aaa")),
+        ))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 with ch2:
@@ -246,8 +226,11 @@ with ch2:
             marker_color=colors,
             hovertemplate="%{y} days<extra></extra>"
         ))
-        fig.update_layout(**plotly_theme(), height=200,
-            yaxis=dict(gridcolor="#eee", tickfont=dict(size=10, color="#aaa")))
+        fig.update_layout(**make_theme(
+            height=200,
+            xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa")),
+            yaxis=dict(gridcolor="#eee", tickfont=dict(size=10, color="#aaa")),
+        ))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 # ── Florida insurance tracker ──────────────────────────────────────────────────
@@ -257,12 +240,12 @@ with st.container(border=True):
     st.caption("Source: FLOIR · OIR rate filings · NFIP")
     i1, i2, i3, i4, i5, i6 = st.columns(6)
     ins_tiles = [
-        (i1, "Avg annual premium", "$6,840", "+11.2% yr/yr", "down"),
-        (i2, "Avg per $1k coverage", "$10.90", "+8.4% yr/yr", "down"),
-        (i3, "Citizens policies", "148k", "−9% (depopulating)", "up"),
-        (i4, "Condo assess. risk", "High", "Post-Surfside SB 4-D", "down"),
-        (i5, "Flood zone · 33301", "AE / VE", "FEMA high-risk", "flat"),
-        (i6, "Avg flood premium", "$2,210", "+14.1% yr/yr", "down"),
+        (i1, "Avg annual premium",   "$6,840", "+11.2% yr/yr",        "down"),
+        (i2, "Avg per $1k coverage", "$10.90", "+8.4% yr/yr",         "down"),
+        (i3, "Citizens policies",    "148k",   "−9% (depopulating)",  "up"),
+        (i4, "Condo assess. risk",   "High",   "Post-Surfside SB 4-D","down"),
+        (i5, "Flood zone · 33301",   "AE / VE","FEMA high-risk",      "flat"),
+        (i6, "Avg flood premium",    "$2,210", "+14.1% yr/yr",        "down"),
     ]
     for col, label, val, delta, direction in ins_tiles:
         with col:
@@ -271,7 +254,7 @@ with st.container(border=True):
     st.markdown("")
     ins_years = [2020, 2021, 2022, 2023, 2024, 2025]
     ins_home  = [3840, 4210, 4890, 5540, 6150, 6840]
-    ins_flood = [890,  970, 1180, 1540, 1940, 2210]
+    ins_flood = [890,   970, 1180, 1540, 1940, 2210]
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=ins_years, y=ins_home, name="Homeowners", mode="lines+markers",
         line=dict(color="#e34948", width=2), fill="tozeroy", fillcolor="rgba(227,73,72,0.07)",
@@ -279,9 +262,12 @@ with st.container(border=True):
     fig.add_trace(go.Scatter(x=ins_years, y=ins_flood, name="Flood (NFIP)", mode="lines+markers",
         line=dict(color="#eda100", width=1.5, dash="dot"),
         marker=dict(size=4), hovertemplate="Flood: $%{y:,}<extra></extra>"))
-    fig.update_layout(**plotly_theme(), height=180,
+    fig.update_layout(**make_theme(
+        height=180,
         legend=dict(orientation="h", y=1.15, x=0, font=dict(size=10)),
-        yaxis=dict(tickprefix="$", tickformat=",", gridcolor="#eee", tickfont=dict(size=10, color="#aaa")))
+        xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa")),
+        yaxis=dict(tickprefix="$", tickformat=",", gridcolor="#eee", tickfont=dict(size=10, color="#aaa")),
+    ))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     st.markdown("""
@@ -298,10 +284,10 @@ with st.container(border=True):
     st.markdown("**Current rates &nbsp;·&nbsp;** <span style='font-size:11px;color:#aaa'>Source: Freddie Mac PMMS · weekly</span>", unsafe_allow_html=True)
     r1, r2, r3, r4 = st.columns(4)
     rate_tiles = [
-        (r1, "30-yr fixed",  f"{rates['rate_30yr']:.2f}%",  f"{rates['chg_30yr']:+.2f}pts wk/wk", "up" if rates["chg_30yr"] < 0 else "down"),
-        (r2, "15-yr fixed",  f"{rates['rate_15yr']:.2f}%",  f"{rates['chg_15yr']:+.2f}pts wk/wk", "up" if rates["chg_15yr"] < 0 else "down"),
-        (r3, "5/1 ARM",      f"{rates['rate_arm']:.2f}%",   f"{rates['chg_arm']:+.2f}pts wk/wk",  "up" if rates["chg_arm"]  < 0 else "down"),
-        (r4, "FHA 30-yr",    f"{rates['rate_fha']:.2f}%",   f"{rates['chg_fha']:+.2f}pts wk/wk",  "up" if rates["chg_fha"]  < 0 else "down"),
+        (r1, "30-yr fixed", f"{rates['rate_30yr']:.2f}%", f"{rates['chg_30yr']:+.2f}pts wk/wk", "up" if rates["chg_30yr"] < 0 else "down"),
+        (r2, "15-yr fixed", f"{rates['rate_15yr']:.2f}%", f"{rates['chg_15yr']:+.2f}pts wk/wk", "up" if rates["chg_15yr"] < 0 else "down"),
+        (r3, "5/1 ARM",     f"{rates['rate_arm']:.2f}%",  f"{rates['chg_arm']:+.2f}pts wk/wk",  "up" if rates["chg_arm"]  < 0 else "down"),
+        (r4, "FHA 30-yr",   f"{rates['rate_fha']:.2f}%",  f"{rates['chg_fha']:+.2f}pts wk/wk",  "up" if rates["chg_fha"]  < 0 else "down"),
     ]
     for col, label, val, delta, direction in rate_tiles:
         with col:
@@ -316,10 +302,12 @@ with st.container(border=True):
     fig.add_trace(go.Scatter(x=rate_hist["week"], y=rate_hist["rate_15yr"], name="15-yr fixed",
         mode="lines+markers", line=dict(color="#1baf7a", width=1.5, dash="dot"),
         marker=dict(size=3), hovertemplate="15-yr: %{y:.2f}%<extra></extra>"))
-    fig.update_layout(**plotly_theme(), height=180,
+    fig.update_layout(**make_theme(
+        height=180,
         legend=dict(orientation="h", y=1.15, x=0, font=dict(size=10)),
-        yaxis=dict(ticksuffix="%", range=[5.5, 8.0], gridcolor="#eee",
-                   tickfont=dict(size=10, color="#aaa")))
+        xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa")),
+        yaxis=dict(ticksuffix="%", range=[5.5, 8.0], gridcolor="#eee", tickfont=dict(size=10, color="#aaa")),
+    ))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     st.markdown("**Affordability at 33301 median price &nbsp;·&nbsp;** <span style='font-size:11px;color:#aaa'>20% down · 30-yr fixed</span>", unsafe_allow_html=True)
